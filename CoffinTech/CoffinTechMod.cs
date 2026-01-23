@@ -9,7 +9,7 @@ internal static class ModInfo
 {
     internal const string Name = "CoffinTech";
     internal const string Author = "Takacomic";
-    internal const string Version = "1.0.0";
+    internal const string Version = "1.1.0";
     internal const string Download = "https://github.com/takacomic/.../latest";
 }
 

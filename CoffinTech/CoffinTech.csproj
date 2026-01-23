@@ -34,6 +34,12 @@
     </ItemGroup>
 
     <ItemGroup>
+        <Reference Include="Il2CppPauseSystem">
+            <HintPath>$(Il2)\Il2CppPauseSystem.dll</HintPath>
+        </Reference>
+        <Reference Include="Il2CppPhaserPort">
+          <HintPath>$(Il2)\Il2CppPhaserPort.dll</HintPath>
+        </Reference>
         <Reference Include="UnityEngine.CoreModule">
             <HintPath>$(Il2)\UnityEngine.CoreModule.dll</HintPath>
         </Reference>

@@ -9,10 +9,11 @@ public static class SpriteImporter
     /// <summary>
     /// Allows the user to load a png texture straight into a Vampire Survivors Sprite. This is done in a hacky way for Unity 6 right now
     /// </summary>
+    /// <param name="callingAssembly">Assembly containing the embedded resources</param>>
     /// <param name="nameSpacePath">Path to the file, typically this is 'namespace'.'folder' if you don't store it in the root </param>
     /// <param name="filename">Name of the file</param>
     /// <returns>Returns a Texture2D of the png you supply</returns>
-    public static Texture2D LoadToSpriteFromAssembly(Assembly callingAssembly, string nameSpacePath, string filename)
+    public static Texture2D LoadTextureFromAssembly(Assembly callingAssembly, string nameSpacePath, string filename)
     {
         ArgumentNullException.ThrowIfNull(callingAssembly);
         if (string.IsNullOrEmpty(nameSpacePath)) 
