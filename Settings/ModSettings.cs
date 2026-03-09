@@ -1,9 +1,5 @@
-using CoffinTech.Logger;
-using Il2CppTMPro;
 using MelonLoader;
-using SurvivorModMenu;
-using UnityEngine;
-using UnityEngine.UI;
+using SurvivorModMenu.ModMenu;
 
 namespace CoffinTech;
 

@@ -78,9 +78,6 @@
         <Reference Include="Il2CppVampireSurvivors">
             <HintPath>$(Il2)\Il2CppVampireSurvivors.Runtime.dll</HintPath>
         </Reference>
-        <Reference Include="FixNullableAttribute">
-            <HintPath>/mnt/data/SteamLibrary/steamapps/common/VSModded/UserLibs/FixNullableAttribute.dll</HintPath>
-        </Reference>
     </ItemGroup>
 
 </Project>

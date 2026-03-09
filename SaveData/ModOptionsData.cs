@@ -401,9 +401,8 @@ public class ModOptionsData
         { 
             if(_doNotCopy.Contains(propertyInfo.Name) || propertyInfo.Name.Contains("BackingField")) 
                 continue;
-            if(propertyInfo.TryGetValue(pod, out var value))
-                if(value != null)
-                    basePod.GetType().GetProperty(propertyInfo.Name)?.SetValue(basePod, value);
+            if (!propertyInfo.TryGetValue(pod, out var value)) continue;
+            basePod.GetType().GetProperty(propertyInfo.Name)?.SetValue(basePod, value);
         }
         return basePod; 
     }
