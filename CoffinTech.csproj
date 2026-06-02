@@ -4,6 +4,7 @@
         <TargetFramework>net6.0</TargetFramework>
         <ImplicitUsings>enable</ImplicitUsings>
         <Nullable>enable</Nullable>
+        <LangVersion>12</LangVersion>
     </PropertyGroup>
 
     <PropertyGroup Condition=" '$(Configuration)' == 'Release' ">
@@ -19,19 +20,24 @@
     </ItemGroup>
 
     <ItemGroup>
-      <Folder Include="ModHelpers\" />
-    </ItemGroup>
-
-    <ItemGroup>
         <ProjectReference Include="../SurvivorModMenu/SurvivorModMenu.csproj" />
     </ItemGroup>
 
     <ItemGroup>
+        <Reference Include="Il2Cppl2localization">
+          <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\VSModded\MelonLoader\Il2CppAssemblies\Il2Cppl2localization.dll</HintPath>
+        </Reference>
+        <Reference Include="Il2CppMAScripts">
+          <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\VSModded\MelonLoader\Il2CppAssemblies\Il2CppMAScripts.dll</HintPath>
+        </Reference>
         <Reference Include="Il2CppPauseSystem">
             <HintPath>$(Il2)\Il2CppPauseSystem.dll</HintPath>
         </Reference>
         <Reference Include="Il2CppPhaserPort">
           <HintPath>$(Il2)\Il2CppPhaserPort.dll</HintPath>
+        </Reference>
+        <Reference Include="Il2CppZenject">
+          <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\VSModded\MelonLoader\Il2CppAssemblies\Il2CppZenject.dll</HintPath>
         </Reference>
         <Reference Include="UnityEngine.AssetBundleModule">
           <HintPath>$(Il2)\UnityEngine.AssetBundleModule.dll</HintPath>
@@ -78,6 +84,17 @@
         <Reference Include="Il2CppVampireSurvivors">
             <HintPath>$(Il2)\Il2CppVampireSurvivors.Runtime.dll</HintPath>
         </Reference>
+    </ItemGroup>
+
+    <ItemGroup>
+      <PackageReference Include="SonarAnalyzer.CSharp" Version="10.21.0.135717">
+        <PrivateAssets>all</PrivateAssets>
+        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      </PackageReference>
+      <PackageReference Include="SonarAnalyzer.CSharp.Styling" Version="10.21.0.135717">
+        <PrivateAssets>all</PrivateAssets>
+        <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
+      </PackageReference>
     </ItemGroup>
 
 </Project>

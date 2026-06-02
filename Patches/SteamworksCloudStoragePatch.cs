@@ -1,3 +1,4 @@
+using System.Collections.Concurrent;
 using System.Text;
 using System.Runtime.CompilerServices;
 using CoffinTech.Logger;
@@ -14,7 +15,7 @@ using UnityEngine;
 
 namespace CoffinTech.Patches;
 
-//Overtake Steam Storage Solution in favor of a Standalone-esque one
+
 [HarmonyPatch(typeof(SteamworksCloudStorage))]
 public static class SteamworksCloudStoragePatch
 {
@@ -26,11 +27,14 @@ public static class SteamworksCloudStoragePatch
     
     // Instance fields
     private static string _storagePath = "";
-    private static readonly Dictionary<string, StandaloneStorage.Blob> Blobs = new();
+    
+    private static readonly ConcurrentDictionary<string, StandaloneStorage.Blob> Blobs = new();
     private static bool _isReady = false;
     
-    // Mod data access
+   
     internal static JObject ObjectToRead { get; private set; } = new();
+    
+    private static readonly object ObjectToReadLock = new();
 
     #region Harmony Patches
 
@@ -48,6 +52,12 @@ public static class SteamworksCloudStoragePatch
             
             // Initialize blobs dictionary
             Blobs.Clear();
+            
+            // Reset ObjectToRead
+            lock (ObjectToReadLock)
+            {
+                ObjectToRead = new JObject();
+            }
             
             // Mark as ready
             _isReady = true;
@@ -90,7 +100,7 @@ public static class SteamworksCloudStoragePatch
             {
                 DebugLogger.Msg($"StandaloneStorage GetBlobsAsync: Found blob '{blobName}' in cache");
                 
-                if (cachedBlob.IsEmpty)
+                if (cachedBlob.IsEmpty || cachedBlob.Data == null)
                 {
                     onComplete.Invoke(StorageResult.NotFound, null);
                 }
@@ -103,7 +113,7 @@ public static class SteamworksCloudStoragePatch
             
             // Load from disk
             StandaloneStorage.Blob? blob = LoadBlobFromDisk(blobName);
-            if (blob != null)
+            if (blob != null && blob.Data != null)
             {
                 Blobs[blobName] = blob;
                 DebugLogger.Msg($"StandaloneStorage GetBlobsAsync: Successfully loaded blob '{blobName}' from disk");
@@ -112,7 +122,10 @@ public static class SteamworksCloudStoragePatch
             else
             {
                 DebugLogger.Msg($"StandaloneStorage GetBlobsAsync: Blob '{blobName}' not found on disk");
-                ObjectToRead = new JObject();
+                lock (ObjectToReadLock)
+                {
+                    ObjectToRead = new JObject();
+                }
                 onComplete.Invoke(StorageResult.NotFound, null);
             }
         }
@@ -287,7 +300,10 @@ public static class SteamworksCloudStoragePatch
             
             // Clear in-memory blobs
             Blobs.Clear();
-            ObjectToRead = new JObject();
+            lock (ObjectToReadLock)
+            {
+                ObjectToRead = new JObject();
+            }
             
             DebugLogger.Msg($"StandaloneStorage EraseAllAsync: Erased {erasedCount} files successfully");
             onComplete.Invoke(StorageResult.Successful);
@@ -374,6 +390,9 @@ public static class SteamworksCloudStoragePatch
 
     #region Data Processing
 
+    /// <summary>
+    /// Converts IL2CPP byte array to managed array and injects mod data.
+    /// </summary>
     private static byte[] ProcessDataForModInjection(Il2CppStructArray<byte> data)
     {
         // Convert IL2CPP array to managed array
@@ -389,7 +408,16 @@ public static class SteamworksCloudStoragePatch
             else
             {
                 string json = Encoding.UTF8.GetString(managedArray);
-                obj = JsonConvert.DeserializeObject(json) as JObject ?? new JObject();
+                // Defensive deserialization - corrupted JSON should not crash
+                try
+                {
+                    obj = JsonConvert.DeserializeObject(json) as JObject ?? new JObject();
+                }
+                catch (Exception ex)
+                {
+                    DebugLogger.Msg($"StandaloneStorage: Failed to deserialize JSON: {ex.Message}");
+                    obj = new JObject();
+                }
             }
             
             // Inject mod data
@@ -415,7 +443,10 @@ public static class SteamworksCloudStoragePatch
         {
             if (data == null || data.Length == 0)
             {
-                ObjectToRead = new JObject();
+                lock (ObjectToReadLock)
+                {
+                    ObjectToRead = new JObject();
+                }
                 return data ?? Array.Empty<byte>();
             }
             
@@ -423,7 +454,10 @@ public static class SteamworksCloudStoragePatch
             JObject obj = JObject.Parse(json);
             
             // Extract mod data for reading
-            ObjectToRead = obj["ModData"] as JObject ?? new JObject();
+            lock (ObjectToReadLock)
+            {
+                ObjectToRead = obj["ModData"] as JObject ?? new JObject();
+            }
             
             // Remove mod data from main object
             obj.Remove("ModData");
@@ -434,7 +468,10 @@ public static class SteamworksCloudStoragePatch
         catch (Exception ex)
         {
             DebugLogger.Msg($"StandaloneStorage: Failed to process data for mod extraction: {ex.Message}");
-            ObjectToRead = new JObject();
+            lock (ObjectToReadLock)
+            {
+                ObjectToRead = new JObject();
+            }
             return data ?? Array.Empty<byte>();
         }
     }

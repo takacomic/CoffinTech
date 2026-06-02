@@ -10,13 +10,22 @@ using UnityEngine;
 
 namespace CoffinTech.Patches;
 
+
 [HarmonyPatch(typeof(SaveUtils))]
 static class SaveUtilsPatch
 {
+
     [HarmonyPatch(nameof(SaveUtils.GetSerializedPlayerData))]
     [HarmonyPrefix]
     public static bool GetSerializedPlayerData(PlayerOptionsData data, ref Il2CppStructArray<byte> __result)
     {
+        // Null check prevents NRE during game states where data might be uninitialized
+        if (data == null)
+        {
+            __result = new Il2CppStructArray<byte>(0);
+            return false;
+        }
+        
         ModOptionsData modOptionsData = new();
         __result = SaveUtils.JsonToBytes(SaveUtils.UpdateChecksum(SaveSerializer.Serialize(modOptionsData.ModDataRemover(data))));
         return  false;
