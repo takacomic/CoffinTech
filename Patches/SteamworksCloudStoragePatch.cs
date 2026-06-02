@@ -30,6 +30,7 @@ public static class SteamworksCloudStoragePatch
     
     private static readonly ConcurrentDictionary<string, StandaloneStorage.Blob> Blobs = new();
     private static bool _isReady = false;
+    private static bool newModdedSave = true;
     
    
     internal static JObject ObjectToRead { get; private set; } = new();
@@ -83,9 +84,13 @@ public static class SteamworksCloudStoragePatch
         try
         {
             DebugLogger.Msg($"StandaloneStorage GetBlobsAsync: Requesting blob '{blobName}'");
-            
+            if (!File.Exists(GetBlobFilePath(ModdedBlobName)) && newModdedSave)
+            {
+                return true;
+            }
             // Force modded blob name
             blobName = ModdedBlobName;
+            newModdedSave = false;
             
             // Validate operation
             StorageResult validateResult = ValidateOperation(blobName, "GetBlobsAsync");
@@ -300,6 +305,7 @@ public static class SteamworksCloudStoragePatch
             
             // Clear in-memory blobs
             Blobs.Clear();
+            newModdedSave = true;
             lock (ObjectToReadLock)
             {
                 ObjectToRead = new JObject();
