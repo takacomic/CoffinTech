@@ -1,5 +1,6 @@
 using System.Reflection;
 using Il2CppInterop.Runtime.InteropTypes.Arrays;
+using Il2CppVampireSurvivors.Graphics;
 using UnityEngine;
 using UnityEngine.Bindings;
 
@@ -99,5 +100,30 @@ public static class SpriteImporter
             var gcHandlePtr = AssetBundle.LoadAsset_Internal_Injected(unitySelf, ref managedSpanWrapper, type);
             return Unmarshal.UnmarshalUnityObject<UnityEngine.Object>(gcHandlePtr);
         }
+    }
+    
+    public static void SpriteStrip(Texture2D texture, string name, int spriteCount)
+    {
+        int baseWidth = texture.width / spriteCount;
+
+        for (int i = 0; i < spriteCount; i++)
+        {
+            string nameAppend = name + "_0" + (i+1);
+            Sprite sprite = LoadSprite(texture, new Rect(baseWidth * i, 0, baseWidth, texture.height), nameAppend);
+            SpriteManager.RegisterSprite(sprite);
+        }
+    }
+    
+    public static void SpriteSingle(Texture2D texture, string name, int width, int height, int x, int y = 0)
+    {
+        string nameAppend = name;
+        Sprite sprite = LoadSprite(texture, new Rect(x, y, width, height), nameAppend);
+        SpriteManager.RegisterSprite(sprite);
+    }
+    internal static Sprite LoadSprite(Texture2D texture, Rect rect, string name)
+    {
+        Sprite sprite = Sprite.Create(texture, new Rect((int)rect.x, (int)rect.y, (int)rect.width, (int)rect.height), new Vector2(0.5f, 0.5f));
+        sprite.name = name;
+        return sprite;
     }
 }

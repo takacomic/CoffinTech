@@ -7,7 +7,7 @@ internal static class DebugLogger
 {
     public static void Msg(string txt)
     {
-        if (!ModSettings.DebugLoggingEnabled)
+        if (!CoffinTechMod.DebugLoggingEnabled)
         {
             return;
         }

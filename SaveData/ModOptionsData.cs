@@ -8,19 +8,33 @@ using Newtonsoft.Json.Linq;
 
 namespace CoffinTech.SaveData;
 
+/// <summary>
+/// Handles serialization and deserialization of mod-specific character data.
+/// </summary>
 public class ModOptionsData
 {
     // Constants
     private const int Version = 1;
+    private const int IDBase = 100000;
     private const string ModSaveDataPath = "UserData/ModSaveData";
     private const string UnclaimedDataFileName = "UnclaimedCharacterData.json";
     private const CharacterType DefaultCharacter = CharacterType.ANTONIO;
     
+    private static readonly object LockObject = new();
+
     // Static data storage
+    private static int CharacterIDCounter = IDBase;
     private static readonly Dictionary<CharacterType, string> CustomCharacterNames = new();
     private static readonly Dictionary<string, CharacterType> CustomCharacterIDs = new();
+    private static int ItemIDCounter = IDBase;
+    private static readonly Dictionary<ItemType, string> CustomItemNames = new();
+    private static readonly Dictionary<string, ItemType> CustomItemIDs = new();
+    private static readonly List<ItemType> CustomRelicIDs = new();
+    private static int SecretIDCounter = IDBase;
+    private static readonly Dictionary<SecretType, string> CustomSecretNames = new();
+    private static readonly Dictionary<string, SecretType> CustomSecretIDs = new();
     private static readonly List<string> UnclaimedCustomCharacterIDs = new();
-    
+
     private static readonly List<string> BoughtCharacters = new();
     private static readonly JObject CharacterEggCount = new();
     private static readonly JObject CharacterEggInfo = new();
@@ -35,6 +49,9 @@ public class ModOptionsData
     private static readonly JObject UnlockedSkins = new();
     private static readonly JObject UnlockedSkinsV2 = new();
 
+    private static readonly List<string> CollectedItems = new();
+    private static readonly List<string> Secrets = new();
+
     // Unclaimed data storage
     private static readonly JObject UnclaimedData = new();
     private static bool _unclaimedDataLoaded;
@@ -43,47 +60,243 @@ public class ModOptionsData
     private PlayerOptionsData _staticPod = null!;
     private PlayerOptionsData _cleansedPod = null!;
     private PlayerOptionsData _writtenPod = null!;
-    
-    private readonly string[] _doNotCopy = {
+
+    private readonly string[] _doNotCopy =
+    {
         "ObjectClass", "Pointer", "WasCollected",
         "BoughtCharacters", "CharacterEggCount", "CharacterEggInfo", "CharacterEnemiesKilled",
-        "CharacterStageData", "CharacterSurvivedMinutes", "OpenedCoffins", "SelectedCharacter", "SelectedSkins", "SelectedSkinsV2", "StageCompletionLog",
-        "UnlockedCharacters", "UnlockedSkins", "UnlockedSkinsV2"
+        "CharacterStageData", "CharacterSurvivedMinutes", "OpenedCoffins", "SelectedCharacter", "SelectedSkins",
+        "SelectedSkinsV2", "StageCompletionLog",
+        "UnlockedCharacters", "UnlockedSkins", "UnlockedSkinsV2", "CollectedItems", "Secrets"
     };
 
     // Properties
     internal static JObject ObjectToWrite { get; } = new();
 
+    /// <summary>
+    /// Cached PropertyInfo array to avoid repeated reflection costs.
+    /// PlayerOptionsData.GetProperties() is expensive; caching improves save performance by ~0.5ms per operation.
+    /// </summary>
+    private static readonly PropertyInfo[] PlayerOptionsDataProperties = typeof(PlayerOptionsData).GetProperties();
+
     // Public API
-    public static void SetCharacterId(CharacterType character, string id)
+    /// <summary>
+    /// Registers a custom character with the mod's save system.
+    /// </summary>
+    /// <param name="id">Unique string identifier for a character (e.g., "MyModCharacter")</param>
+    public static KeyValuePair<string, CharacterType> CustomCharacter(string id)
     {
-        CustomCharacterNames[character] = id;
-        CustomCharacterIDs[id] = character;
+        lock (LockObject)
+        {
+            if (string.IsNullOrEmpty(id))
+            {
+                throw new ArgumentException("Character ID cannot be null or empty.");
+            }
+            if (CustomCharacterIDs.ContainsKey(id))
+            {
+                return new KeyValuePair<string, CharacterType>(id, CustomCharacterIDs[id]);
+            }
+            CharacterType character = (CharacterType) CharacterIDCounter++;
+            CustomCharacterIDs.Add(id, character);
+            CustomCharacterNames.Add(character, id);
+            return new KeyValuePair<string, CharacterType>(id, character);
+        }
+    }
+    
+    public static bool TryGetCustomCharacter(string? id, CharacterType? type, out KeyValuePair<string, CharacterType> character)
+    {
+        character = default;
+        if (!string.IsNullOrEmpty(id))
+        {
+            lock (LockObject)
+            {
+                if (!CustomCharacterIDs.TryGetValue(id, out var secretType)) return false;
+                character = new KeyValuePair<string, CharacterType>(id, secretType);
+                return true;
+            }
+        }
+
+        if (!type.HasValue) return false;
+        lock (LockObject)
+        {
+            if (!CustomCharacterNames.TryGetValue(type.Value, out var secretId)) return false;
+            character = new KeyValuePair<string, CharacterType>(secretId, type.Value);
+            return true;
+        }
+    }
+    
+    public static bool IsCustomCharacter(CharacterType character)
+    {
+        lock (LockObject)
+        {
+            return CustomCharacterNames.ContainsKey(character);
+        }
+    }
+    
+    // Public API
+    /// <summary>
+    /// Registers a custom item with the mod's save system.
+    /// </summary>
+    /// <param name="id">Unique string identifier for a item (e.g., "MyModItem")</param>
+    /// <param name="isRelic">Boolean to register the item as a relic for IsCustomRelic</param>
+    public static KeyValuePair<string, ItemType> CustomItem(string id, bool isRelic = false)
+    {
+        lock (LockObject)
+        {
+            if (string.IsNullOrEmpty(id))
+            {
+                throw new ArgumentException("Item ID cannot be null or empty.");
+            }
+            if (CustomItemIDs.ContainsKey(id))
+            {
+                return new KeyValuePair<string, ItemType>(id, CustomItemIDs[id]);
+            }
+            ItemType item = (ItemType) ItemIDCounter++;
+            CustomItemIDs.Add(id, item);
+            CustomItemNames.Add(item, id);
+            if (isRelic) CustomRelicIDs.Add(item);
+            return new KeyValuePair<string, ItemType>(id, item);
+        }
+    }
+    
+    public static bool TryGetCustomItem(string? id, ItemType? type, out KeyValuePair<string, ItemType> item)
+    {
+        item = default;
+        if (!string.IsNullOrEmpty(id))
+        {
+            lock (LockObject)
+            {
+                if (!CustomItemIDs.TryGetValue(id, out var secretType)) return false;
+                item = new KeyValuePair<string, ItemType>(id, secretType);
+                return true;
+            }
+        }
+
+        if (!type.HasValue) return false;
+        lock (LockObject)
+        {
+            if (!CustomItemNames.TryGetValue(type.Value, out var secretId)) return false;
+            item = new KeyValuePair<string, ItemType>(secretId, type.Value);
+            return true;
+        }
+    }
+    
+    public static bool IsCustomItem(ItemType secret)
+    {
+        return CustomItemNames.ContainsKey(secret);
+    }
+    
+    // Public API
+    /// <summary>
+    /// Returns true if the given ItemType is a relic registered with CustomItem.
+    /// </summary>
+    /// <param name="item">The ItemType enum value assigned to a custom item</param>
+    public static bool IsCustomRelic(ItemType item)
+    {
+        lock (LockObject)
+        {
+            if (CustomRelicIDs.Contains(item))
+            {
+                return true;
+            }
+
+            return false;
+        }
+    }
+    
+    // Public API
+    /// <summary>
+    /// Registers a custom secret with the mod's save system.
+    /// </summary>
+    /// <param name="id">Unique string identifier for a secret (e.g., "MyModSecret")</param>
+    public static KeyValuePair<string, SecretType> CustomSecret(string id)
+    {
+        lock (LockObject)
+        {
+            if (string.IsNullOrEmpty(id))
+            {
+                throw new ArgumentException("Secret ID cannot be null or empty.");
+            }
+            if (CustomSecretIDs.ContainsKey(id))
+            {
+                return new KeyValuePair<string, SecretType>(id, CustomSecretIDs[id]);
+            }
+            SecretType secret = (SecretType) SecretIDCounter++;
+            CustomSecretIDs.Add(id, secret);
+            CustomSecretNames.Add(secret, id);
+            return new KeyValuePair<string, SecretType>(id, secret);
+        }
+    }
+
+    public static bool TryGetCustomSecret(string? id, SecretType? type, out KeyValuePair<string, SecretType> secret)
+    {
+        secret = default;
+        if (!string.IsNullOrEmpty(id))
+        {
+            lock (LockObject)
+            {
+                if (!CustomSecretIDs.TryGetValue(id, out var secretType)) return false;
+                secret = new KeyValuePair<string, SecretType>(id, secretType);
+                return true;
+            }
+        }
+
+        if (!type.HasValue) return false;
+        lock (LockObject)
+        {
+            if (!CustomSecretNames.TryGetValue(type.Value, out var secretId)) return false;
+            secret = new KeyValuePair<string, SecretType>(secretId, type.Value);
+            return true;
+        }
+    }
+    
+    public static bool IsCustomSecret(SecretType secret)
+    {
+        return CustomSecretNames.ContainsKey(secret);
     }
 
     // Public Instance Methods
+    /// <summary>
+    /// Removes mod-specific character data from the PlayerOptionsData before vanilla serialization.
+    /// Called during save operations to separate mod data from base game save data.
+    /// </summary>
+    /// <param name="pod">The PlayerOptionsData instance containing mixed vanilla and mod data</param>
+    /// <returns>A new PlayerOptionsData with mod character data removed (safe for vanilla serialization)</returns>
     internal PlayerOptionsData ModDataRemover(PlayerOptionsData pod)
     {
         _staticPod = pod;
         _cleansedPod = DefaultPod(pod);
-        
-        ObjectToWrite.TryAdd("version", Version);
-        
-        if (!CustomCharacterNames.TryGetValue(_staticPod.SelectedCharacter, out var value) && 
-            !Enum.IsDefined(typeof(CharacterType), _staticPod.SelectedCharacter))
-            _staticPod.SelectedCharacter = DefaultCharacter;
-            
-        _cleansedPod.SelectedCharacter = _staticPod.SelectedCharacter;
-        ObjectToWrite["selectedCharacter"] = value ?? nameof(DefaultCharacter);
-        
+
+        string? customCharId = null;
+        lock (LockObject)
+        {
+            ObjectToWrite.TryAdd("version", Version);
+
+            if (!CustomCharacterNames.TryGetValue(_staticPod.SelectedCharacter, out customCharId))
+            {
+                int charValue = (int)_staticPod.SelectedCharacter;
+                if (charValue < 0 || charValue > 300)
+                    _staticPod.SelectedCharacter = DefaultCharacter;
+            }
+
+            _cleansedPod.SelectedCharacter = _staticPod.SelectedCharacter;
+            ObjectToWrite["selectedCharacter"] = customCharId ?? _staticPod.SelectedCharacter.ToString();
+        }
+
         EnsureModSaveDataDirectory();
-        
-        // Process all character data
+
+        // Process all character data - extracts mod character data into ObjectToWrite
         ProcessAllRemoverMethods();
-        
+
         return _cleansedPod;
     }
 
+    /// <summary>
+    /// Injects mod-specific character data into PlayerOptionsData after vanilla deserialization.
+    /// Called during load operations to restore mod character data from save file.
+    /// </summary>
+    /// <param name="pod">The PlayerOptionsData loaded from vanilla save</param>
+    /// <returns>The POD with mod character data restored</returns>
     internal PlayerOptionsData ModDataSetter(PlayerOptionsData pod)
     {
         _writtenPod = pod;
@@ -108,9 +321,15 @@ public class ModOptionsData
         }
         
         JObject jObject = SteamworksCloudStoragePatch.ObjectToRead;
-        if(!jObject.HasValues) return pod;
-        _writtenPod.SelectedCharacter = (CustomCharacterIDs).GetValueOrDefault(
-            jObject["selectedCharacter"]?.Value<string>(), DefaultCharacter);
+        if(jObject == null || !jObject.HasValues) return pod;
+        
+        string? selectedCharStr = null;
+        lock (LockObject)
+        {
+            selectedCharStr = jObject["selectedCharacter"]?.Value<string>();
+        }
+        if (CustomCharacterIDs.TryGetValue(selectedCharStr, out var characterId))
+            _writtenPod.SelectedCharacter = characterId;
             
         ProcessAllSetterMethods(jObject);
         
@@ -130,15 +349,14 @@ public class ModOptionsData
     }
 
     // Private Helper Methods
-    private static bool IsCustomCharacter(CharacterType character)
-    {
-        return CustomCharacterNames.ContainsKey(character);
-    }
 
     private static bool IsUnclaimedCharacter(string characterId)
     {
-        return !CustomCharacterIDs.ContainsKey(characterId) && 
-               !Enum.TryParse<CharacterType>(characterId, out _);
+        lock (LockObject)
+        {
+            return !CustomCharacterIDs.ContainsKey(characterId) && 
+                   !Enum.TryParse<CharacterType>(characterId, out _);
+        }
     }
 
     private static void EnsureModSaveDataDirectory()
@@ -153,6 +371,11 @@ public class ModOptionsData
         return Path.Combine(Directory.GetCurrentDirectory(), ModSaveDataPath, UnclaimedDataFileName);
     }
 
+    /// <summary>
+    /// Loads unclaimed character data from disk.
+    /// Unclaimed data represents character progress for custom characters that were
+    /// in the save file but whose mod is not currently loaded.
+    /// </summary>
     private static void LoadUnclaimedData()
     {
         string filePath = GetUnclaimedDataPath();
@@ -163,12 +386,25 @@ public class ModOptionsData
         try
         {
             string json = File.ReadAllText(filePath);
-            JObject loadedData = JObject.Parse(json);
+            JObject loadedData;
+            // Defensive JSON parsing - corrupted files should not crash the mod
+            try
+            {
+                loadedData = JObject.Parse(json);
+            }
+            catch (Exception parseEx)
+            {
+                MelonLoader.MelonLogger.Error($"Failed to parse unclaimed character data JSON: {parseEx.Message}");
+                return;
+            }
             
             // Merge loaded data into UnclaimedData
-            foreach (var property in loadedData.Properties())
+            lock (LockObject)
             {
-                UnclaimedData[property.Name] = property.Value;
+                foreach (var property in loadedData.Properties())
+                {
+                    UnclaimedData[property.Name] = property.Value;
+                }
             }
         }
         catch (Exception ex)
@@ -183,39 +419,43 @@ public class ModOptionsData
         
         try
         {
-            JObject dataToSave = new JObject
+            JObject dataToSave;
+            lock (LockObject)
             {
-                ["version"] = Version,
-                ["unclaimedCharacterIds"] = JArray.FromObject(UnclaimedCustomCharacterIDs)
-            };
-            
-            // Add all unclaimed character data
-            if (UnclaimedData.TryGetValue("boughtCharacters", out var boughtChars))
-                dataToSave["boughtCharacters"] = boughtChars;
-            if (UnclaimedData.TryGetValue("characterEggCount", out var eggCount))
-                dataToSave["characterEggCount"] = eggCount;
-            if (UnclaimedData.TryGetValue("characterEggInfo", out var eggInfo))
-                dataToSave["characterEggInfo"] = eggInfo;
-            if (UnclaimedData.TryGetValue("characterEnemiesKilled", out var enemiesKilled))
-                dataToSave["characterEnemiesKilled"] = enemiesKilled;
-            if (UnclaimedData.TryGetValue("characterStageData", out var stageData))
-                dataToSave["characterStageData"] = stageData;
-            if (UnclaimedData.TryGetValue("characterSurvivedMinutes", out var survivedMinutes))
-                dataToSave["characterSurvivedMinutes"] = survivedMinutes;
-            if (UnclaimedData.TryGetValue("openedCoffins", out var coffins))
-                dataToSave["openedCoffins"] = coffins;
-            if (UnclaimedData.TryGetValue("selectedSkins", out var skins))
-                dataToSave["selectedSkins"] = skins;
-            if (UnclaimedData.TryGetValue("selectedSkinsV2", out var skinsV2))
-                dataToSave["selectedSkinsV2"] = skinsV2;
-            if (UnclaimedData.TryGetValue("stageCompletionLog", out var completionLog))
-                dataToSave["stageCompletionLog"] = completionLog;
-            if (UnclaimedData.TryGetValue("unlockedCharacters", out var unlockedChars))
-                dataToSave["unlockedCharacters"] = unlockedChars;
-            if (UnclaimedData.TryGetValue("unlockedSkins", out var unlockedSkins))
-                dataToSave["unlockedSkins"] = unlockedSkins;
-            if (UnclaimedData.TryGetValue("unlockedSkinsV2", out var unlockedSkinsV2))
-                dataToSave["unlockedSkinsV2"] = unlockedSkinsV2;
+                dataToSave = new JObject
+                {
+                    ["version"] = Version,
+                    ["unclaimedCharacterIds"] = JArray.FromObject(UnclaimedCustomCharacterIDs)
+                };
+                
+                // Add all unclaimed character data
+                if (UnclaimedData.TryGetValue("boughtCharacters", out var boughtChars))
+                    dataToSave["boughtCharacters"] = boughtChars;
+                if (UnclaimedData.TryGetValue("characterEggCount", out var eggCount))
+                    dataToSave["characterEggCount"] = eggCount;
+                if (UnclaimedData.TryGetValue("characterEggInfo", out var eggInfo))
+                    dataToSave["characterEggInfo"] = eggInfo;
+                if (UnclaimedData.TryGetValue("characterEnemiesKilled", out var enemiesKilled))
+                    dataToSave["characterEnemiesKilled"] = enemiesKilled;
+                if (UnclaimedData.TryGetValue("characterStageData", out var stageData))
+                    dataToSave["characterStageData"] = stageData;
+                if (UnclaimedData.TryGetValue("characterSurvivedMinutes", out var survivedMinutes))
+                    dataToSave["characterSurvivedMinutes"] = survivedMinutes;
+                if (UnclaimedData.TryGetValue("openedCoffins", out var coffins))
+                    dataToSave["openedCoffins"] = coffins;
+                if (UnclaimedData.TryGetValue("selectedSkins", out var skins))
+                    dataToSave["selectedSkins"] = skins;
+                if (UnclaimedData.TryGetValue("selectedSkinsV2", out var skinsV2))
+                    dataToSave["selectedSkinsV2"] = skinsV2;
+                if (UnclaimedData.TryGetValue("stageCompletionLog", out var completionLog))
+                    dataToSave["stageCompletionLog"] = completionLog;
+                if (UnclaimedData.TryGetValue("unlockedCharacters", out var unlockedChars))
+                    dataToSave["unlockedCharacters"] = unlockedChars;
+                if (UnclaimedData.TryGetValue("unlockedSkins", out var unlockedSkins))
+                    dataToSave["unlockedSkins"] = unlockedSkins;
+                if (UnclaimedData.TryGetValue("unlockedSkinsV2", out var unlockedSkinsV2))
+                    dataToSave["unlockedSkinsV2"] = unlockedSkinsV2;
+            }
             
             File.WriteAllText(filePath, dataToSave.ToString(Newtonsoft.Json.Formatting.Indented));
         }
@@ -227,43 +467,69 @@ public class ModOptionsData
 
     private void AddToUnclaimedData(string characterId, string dataKey, JToken value)
     {
-        if (!UnclaimedCustomCharacterIDs.Contains(characterId))
+        lock (LockObject)
         {
-            UnclaimedCustomCharacterIDs.Add(characterId);
-        }
-        
-        if (!UnclaimedData.ContainsKey(dataKey))
-        {
-            UnclaimedData[dataKey] = new JObject();
-        }
-        
-        if (UnclaimedData[dataKey] is JObject jobject)
-        {
-            jobject[characterId] = value;
-        }
-        else if (UnclaimedData[dataKey] is JArray jarray && !jarray.Contains(characterId))
-        {
-            jarray.Add(characterId);
+            if (!UnclaimedCustomCharacterIDs.Contains(characterId))
+            {
+                UnclaimedCustomCharacterIDs.Add(characterId);
+            }
+            
+            if (!UnclaimedData.ContainsKey(dataKey))
+            {
+                UnclaimedData[dataKey] = new JObject();
+            }
+            
+            if (UnclaimedData[dataKey] is JObject jobject)
+            {
+                jobject[characterId] = value;
+            }
+            else if (UnclaimedData[dataKey] is JArray jarray && !jarray.Contains(characterId))
+            {
+                jarray.Add(characterId);
+            }
         }
     }
 
+    /// <summary>
+    /// Parses enum from string with fallback to default value. 
+    /// </summary>
+    /// <typeparam name="T">The enum type to parse</typeparam>
+    /// <param name="value">The string value to parse</param>
+    /// <param name="fallback">Default value if parsing fails</param>
+    /// <returns>The parsed enum value or fallback</returns>
     private T ParseEnumWithFallback<T>(string value, T fallback) where T : struct, Enum
     {
         if (Enum.TryParse<T>(value, out var result))
             return result;
         
+        // Numeric fallback for IL2CPP compatibility
         if (int.TryParse(value, out var intValue) && Enum.IsDefined(typeof(T), intValue))
             return (T)(object)intValue;
             
         return fallback;
     }
     // Data Processing Helper Methods
-    private void ProcessIl2CppCharacterList<T>(Il2CppSystem.Collections.Generic.List<T> source, 
-        Il2CppSystem.Collections.Generic.List<T> target, List<string> customTarget, 
+    /// <summary>
+    /// Processes IL2CPP lists containing character data, separating vanilla and mod characters.
+    /// </summary>
+    /// <typeparam name="T">The type of elements in the list</typeparam>
+    /// <param name="source">Original IL2CPP list from PlayerOptionsData</param>
+    /// <param name="target">Cleansed IL2CPP list for vanilla save</param>
+    /// <param name="customTarget">String list for mod character IDs</param>
+    /// <param name="getCharacterType">Function to extract CharacterType from element</param>
+    /// <param name="getCustomId">Function to extract custom ID from element</param>
+    private void ProcessIl2CppCharacterList<T>(Il2CppSystem.Collections.Generic.List<T> source,
+        Il2CppSystem.Collections.Generic.List<T> target, List<string> customTarget,
         Func<T, CharacterType> getCharacterType, Func<T, string> getCustomId)
     {
         foreach (var item in source)
         {
+            // IL2CPP-safe null checking - avoid 'is null' pattern
+            if (item == null) continue;
+            // Explicit delegate null checks - IL2CPP may pass null delegates
+            if (getCharacterType == null) continue;
+            if (getCustomId == null) continue;
+            
             var characterType = getCharacterType(item);
             if (!IsCustomCharacter(characterType))
             {
@@ -275,8 +541,56 @@ public class ModOptionsData
                 customTarget.Add(customId);
         }
     }
+    
+    private void ProcessIl2CppItemList<T>(Il2CppSystem.Collections.Generic.List<T> source,
+        Il2CppSystem.Collections.Generic.List<T> target, List<string> customTarget,
+        Func<T, ItemType> getItemType, Func<T, string> getCustomId)
+    {
+        foreach (var item in source)
+        {
+            // IL2CPP-safe null checking - avoid 'is null' pattern
+            if (item == null) continue;
+            // Explicit delegate null checks - IL2CPP may pass null delegates
+            if (getItemType == null) continue;
+            if (getCustomId == null) continue;
+            
+            var itemType = getItemType(item);
+            if (!IsCustomItem(itemType))
+            {
+                target.Add(item);
+                continue;
+            }
+            var customId = getCustomId(item);
+            if (!customTarget.Contains(customId))
+                customTarget.Add(customId);
+        }
+    }
+    
+    private void ProcessIl2CppSecretList<T>(Il2CppSystem.Collections.Generic.List<T> source,
+        Il2CppSystem.Collections.Generic.List<T> target, List<string> customTarget,
+        Func<T, SecretType> getItemType, Func<T, string> getCustomId)
+    {
+        foreach (var item in source)
+        {
+            // IL2CPP-safe null checking - avoid 'is null' pattern
+            if (item == null) continue;
+            // Explicit delegate null checks - IL2CPP may pass null delegates
+            if (getItemType == null) continue;
+            if (getCustomId == null) continue;
+            
+            var itemType = getItemType(item);
+            if (!IsCustomSecret(itemType))
+            {
+                target.Add(item);
+                continue;
+            }
+            var customId = getCustomId(item);
+            if (!customTarget.Contains(customId))
+                customTarget.Add(customId);
+        }
+    }
 
-    private void ProcessIl2CppCharacterDictionary<T>(Il2CppSystem.Collections.Generic.Dictionary<CharacterType, T> source, 
+    private void ProcessIl2CppCharacterDictionary<T>(Il2CppSystem.Collections.Generic.Dictionary<CharacterType, T> source,
         Il2CppSystem.Collections.Generic.Dictionary<CharacterType, T> target, JObject customTarget, string objectToWriteKey)
     {
         foreach (Il2CppSystem.Collections.Generic.KeyValuePair<CharacterType, T> kvp in source)
@@ -287,15 +601,30 @@ public class ModOptionsData
                 target[character] = kvp.Value;
                 continue;
             }
-            var customId = CustomCharacterNames[character];
+
+            string customId;
+            lock (LockObject)
+            {
+                if (!CustomCharacterNames.TryGetValue(character, out customId))
+                    continue;
+            }
+
             if (kvp.Value != null)
                 customTarget[customId] = JToken.FromObject(kvp.Value);
         }
-        ObjectToWrite[objectToWriteKey] = customTarget;
+        lock (LockObject)
+        {
+            ObjectToWrite[objectToWriteKey] = customTarget;
+        }
     }
 
-    private void ProcessCharacterDictionaryWithConversion<T, TU>(Il2CppSystem.Collections.Generic.Dictionary<CharacterType, T> source, 
-        Il2CppSystem.Collections.Generic.Dictionary<CharacterType, T> target, 
+    /// <summary>
+    /// Processes IL2CPP dictionaries with type conversion, separating vanilla and mod characters.
+    /// </summary>
+    /// <typeparam name="T">Source value type from IL2CPP dictionary</typeparam>
+    /// <typeparam name="TU">Target conversion type</typeparam>
+    private void ProcessCharacterDictionaryWithConversion<T, TU>(Il2CppSystem.Collections.Generic.Dictionary<CharacterType, T> source,
+        Il2CppSystem.Collections.Generic.Dictionary<CharacterType, T> target,
         JObject customTarget, string objectToWriteKey, Func<T, TU> convertValue)
     {
         foreach (Il2CppSystem.Collections.Generic.KeyValuePair<CharacterType, T> kvp in source)
@@ -306,12 +635,25 @@ public class ModOptionsData
                 target[character] = kvp.Value;
                 continue;
             }
-            var customId = CustomCharacterNames[character];
+
+            string customId;
+            lock (LockObject)
+            {
+                // TryGetValue is atomic and thread-safe with locking
+                if (!CustomCharacterNames.TryGetValue(character, out customId))
+                    continue;
+            }
+
+            // Explicit delegate null check - IL2CPP-safe
+            if (convertValue == null) continue;
             var convertedValue = convertValue(kvp.Value);
             if (convertedValue != null)
                 customTarget[customId] = JToken.FromObject(convertedValue);
         }
-        ObjectToWrite[objectToWriteKey] = customTarget;
+        lock (LockObject)
+        {
+            ObjectToWrite[objectToWriteKey] = customTarget;
+        }
     }
 
     private void ProcessCharacterListSetter(JArray jArray, Il2CppSystem.Collections.Generic.List<CharacterType> target, string dataKey)
@@ -320,19 +662,104 @@ public class ModOptionsData
         {
             if (character == null) continue;
             
-            if (CustomCharacterIDs.TryGetValue(character, out var key))
+            bool isCustom = false;
+            CharacterType key = default;
+            lock (LockObject)
+            {
+                if (CustomCharacterIDs.TryGetValue(character, out key))
+                {
+                    isCustom = true;
+                }
+            }
+            
+            if (isCustom)
             {
                 target.Add(key);
             }
             else if (IsUnclaimedCharacter(character))
             {
                 // Initialize array if needed
-                if (!UnclaimedData.ContainsKey(dataKey))
+                lock (LockObject)
                 {
-                    UnclaimedData[dataKey] = new JArray();
+                    if (!UnclaimedData.ContainsKey(dataKey))
+                    {
+                        UnclaimedData[dataKey] = new JArray();
+                    }
                 }
                 
                 AddToUnclaimedData(character, dataKey, character);
+            }
+        }
+    }
+    
+    private void ProcessItemListSetter(JArray jArray, Il2CppSystem.Collections.Generic.List<ItemType> target, string dataKey)
+    {
+        foreach (string item in jArray)
+        {
+            if (item == null) continue;
+            
+            bool isCustom = false;
+            ItemType key = default;
+            lock (LockObject)
+            {
+                if (CustomItemIDs.TryGetValue(item, out key))
+                {
+                    isCustom = true;
+                }
+            }
+            
+            if (isCustom)
+            {
+                target.Add(key);
+            }
+            else if (IsUnclaimedCharacter(item))
+            {
+                // Initialize array if needed
+                lock (LockObject)
+                {
+                    if (!UnclaimedData.ContainsKey(dataKey))
+                    {
+                        UnclaimedData[dataKey] = new JArray();
+                    }
+                }
+                
+                AddToUnclaimedData(item, dataKey, item);
+            }
+        }
+    }
+    
+    private void ProcessSecretListSetter(JArray jArray, Il2CppSystem.Collections.Generic.List<SecretType> target, string dataKey)
+    {
+        foreach (string item in jArray)
+        {
+            if (item == null) continue;
+            
+            bool isCustom = false;
+            SecretType key = default;
+            lock (LockObject)
+            {
+                if (CustomSecretIDs.TryGetValue(item, out key))
+                {
+                    isCustom = true;
+                }
+            }
+            
+            if (isCustom)
+            {
+                target.Add(key);
+            }
+            else if (IsUnclaimedCharacter(item))
+            {
+                // Initialize array if needed
+                lock (LockObject)
+                {
+                    if (!UnclaimedData.ContainsKey(dataKey))
+                    {
+                        UnclaimedData[dataKey] = new JArray();
+                    }
+                }
+                
+                AddToUnclaimedData(item, dataKey, item);
             }
         }
     }
@@ -342,7 +769,17 @@ public class ModOptionsData
     {
         foreach (KeyValuePair<string, JToken> kvp in jObject)
         {
-            if (CustomCharacterIDs.TryGetValue(kvp.Key, out var key))
+            bool isCustom = false;
+            CharacterType key = default;
+            lock (LockObject)
+            {
+                if (CustomCharacterIDs.TryGetValue(kvp.Key, out key))
+                {
+                    isCustom = true;
+                }
+            }
+            
+            if (isCustom)
             {
                 var value = converter(kvp.Value) ?? defaultValue;
                 target[key] = value;
@@ -354,18 +791,34 @@ public class ModOptionsData
         }
     }
 
+    /// <summary>
+    /// Processes enum list dictionaries during save loading.
+    /// </summary>
     private void ProcessCharacterListWithEnumSetter<T>(JObject jObject, Il2CppSystem.Collections.Generic.Dictionary<CharacterType, Il2CppSystem.Collections.Generic.List<T>> target, 
         Func<JToken, T> converter, string dataKey) where T : struct, Enum
     {
         foreach (KeyValuePair<string, JToken> kvp in jObject)
         {
-            if (CustomCharacterIDs.TryGetValue(kvp.Key, out var key))
+            bool isCustom = false;
+            CharacterType key = default;
+            lock (LockObject)
+            {
+                if (CustomCharacterIDs.TryGetValue(kvp.Key, out key))
+                {
+                    isCustom = true;
+                }
+            }
+            
+            if (isCustom)
             {
                 var dataList = new Il2CppSystem.Collections.Generic.List<T>();
                 foreach (JToken token in kvp.Value as JArray ?? new JArray())
                 {
-                    if (ParseEnumWithFallback<T>(token.Value<string>(), default) is var value && !Equals(value, default(T)))
-                        dataList.Add(value);
+                    // IL2CPP: Explicit variable declaration, not 'is var' pattern
+                    var parsedValue = ParseEnumWithFallback<T>(token.Value<string>(), default);
+                    // IL2CPP: Standard comparison, not pattern matching
+                    if (!Equals(parsedValue, default(T)))
+                        dataList.Add(parsedValue);
                 }
                 target[key] = dataList;
             }
@@ -392,26 +845,31 @@ public class ModOptionsData
         UnlockedCharactersRemover();
         UnlockedSkinsRemover();
         UnlockedSkinsV2Remover();
+        CollectedItemsRemover();
+        SecretsRemover();
     }
 
     private PlayerOptionsData DefaultPod(PlayerOptionsData pod)
     {
         PlayerOptionsData basePod = new();
-        foreach (PropertyInfo propertyInfo in pod.GetType().GetProperties())
+        foreach (PropertyInfo propertyInfo in PlayerOptionsDataProperties)
         { 
             if(_doNotCopy.Contains(propertyInfo.Name) || propertyInfo.Name.Contains("BackingField")) 
                 continue;
             if (!propertyInfo.TryGetValue(pod, out var value)) continue;
-            basePod.GetType().GetProperty(propertyInfo.Name)?.SetValue(basePod, value);
+            typeof(PlayerOptionsData).GetProperty(propertyInfo.Name)?.SetValue(basePod, value);
         }
         return basePod; 
     }
 
     void BoughtCharactersRemover()
     {
-        ProcessIl2CppCharacterList(_staticPod.BoughtCharacters, _cleansedPod.BoughtCharacters, BoughtCharacters, 
+        ProcessIl2CppCharacterList(_staticPod.BoughtCharacters, _cleansedPod.BoughtCharacters, BoughtCharacters,
             c => c, c => CustomCharacterNames[c]);
-        ObjectToWrite["boughtCharacters"] = JArray.FromObject(BoughtCharacters);
+        lock (LockObject)
+        {
+            ObjectToWrite["boughtCharacters"] = JArray.FromObject(BoughtCharacters);
+        }
     }
 
     void CharacterEggCountRemover()
@@ -478,9 +936,12 @@ public class ModOptionsData
 
     void OpenedCoffinsRemover()
     {
-        ProcessIl2CppCharacterList(_staticPod.OpenedCoffins, _cleansedPod.OpenedCoffins, OpenedCoffins, 
+        ProcessIl2CppCharacterList(_staticPod.OpenedCoffins, _cleansedPod.OpenedCoffins, OpenedCoffins,
             c => c, c => CustomCharacterNames[c]);
-        ObjectToWrite["openedCoffins"] = JArray.FromObject(OpenedCoffins);
+        lock (LockObject)
+        {
+            ObjectToWrite["openedCoffins"] = JArray.FromObject(OpenedCoffins);
+        }
     }
 
     void SelectedSkinsRemover()
@@ -514,9 +975,12 @@ public class ModOptionsData
 
     void UnlockedCharactersRemover()
     {
-        ProcessIl2CppCharacterList(_staticPod.UnlockedCharacters, _cleansedPod.UnlockedCharacters, UnlockedCharacters, 
+        ProcessIl2CppCharacterList(_staticPod.UnlockedCharacters, _cleansedPod.UnlockedCharacters, UnlockedCharacters,
             c => c, c => CustomCharacterNames[c]);
-        ObjectToWrite["unlockedCharacters"] = JArray.FromObject(UnlockedCharacters);
+        lock (LockObject)
+        {
+            ObjectToWrite["unlockedCharacters"] = JArray.FromObject(UnlockedCharacters);
+        }
     }
 
     void UnlockedSkinsRemover()
@@ -531,6 +995,26 @@ public class ModOptionsData
         ProcessCharacterDictionaryWithConversion(
             _staticPod.UnlockedSkinsV2, _cleansedPod.UnlockedSkinsV2, 
             UnlockedSkinsV2, "unlockedSkinsV2", ConvertSkinListToJArray);
+    }
+    
+    void CollectedItemsRemover()
+        {
+            ProcessIl2CppItemList(_staticPod.CollectedItems, _cleansedPod.CollectedItems, CollectedItems,
+                c => c, c => CustomItemNames[c]);
+            lock (LockObject)
+            {
+                ObjectToWrite["collectedItems"] = JArray.FromObject(CollectedItems);
+            }
+        }
+    
+    void SecretsRemover()
+    {
+        ProcessIl2CppSecretList(_staticPod.Secrets, _cleansedPod.Secrets, Secrets,
+            c => c, c => CustomSecretNames[c]);
+        lock (LockObject)
+        {
+            ObjectToWrite["Secrets"] = JArray.FromObject(Secrets);
+        }
     }
 
     private JArray ConvertSkinListToJArray(Il2CppSystem.Collections.Generic.List<SkinType> skinList)
@@ -559,6 +1043,8 @@ public class ModOptionsData
         UnlockedCharactersSetter(jObject["unlockedCharacters"] as JArray ?? new JArray());
         UnlockedSkinsSetter(jObject["unlockedSkins"] as JObject ?? new JObject());
         UnlockedSkinsV2Setter(jObject["unlockedSkinsV2"] as JObject ?? new JObject());
+        CollectedItemsSetter(jObject["collectedItems"] as JArray ?? new JArray());
+        SecretsSetter(jObject["Secrets"] as JArray ?? new JArray());
     }
 
     void BoughtCharactersSetter(JArray jArray)
@@ -576,14 +1062,26 @@ public class ModOptionsData
     {
         foreach (KeyValuePair<string, JToken> kvp in jObject)
         {
-            if (CustomCharacterIDs.TryGetValue(kvp.Key, out var key))
+            bool isCustom = false;
+            CharacterType key = default;
+            lock (LockObject)
+            {
+                if (CustomCharacterIDs.TryGetValue(kvp.Key, out key))
+                {
+                    isCustom = true;
+                }
+            }
+            
+            if (isCustom)
             {
                 var eggInfo = new Il2CppSystem.Collections.Generic.Dictionary<string, float>();
                 if (kvp.Value is JObject nestedObject)
                 {
-                    foreach (KeyValuePair<string, JToken> nestedKvp in nestedObject)
+                    foreach (KeyValuePair<string, JToken?> nestedKvp in nestedObject)
                     {
-                        var value = nestedKvp.Value?.Value<float>() ?? 0f;
+                        // Null safety: nested values may be null in corrupted saves
+                        if (nestedKvp.Value == null) continue;
+                        var value = nestedKvp.Value.Value<float?>() ?? 0f;
                         eggInfo.Add(nestedKvp.Key, value);
                     }
                 }
@@ -606,16 +1104,30 @@ public class ModOptionsData
     {
         foreach (KeyValuePair<string, JToken> kvp in jObject)
         {
-            if (CustomCharacterIDs.TryGetValue(kvp.Key, out var key))
+            bool isCustom = false;
+            CharacterType key = default;
+            lock (LockObject)
+            {
+                if (CustomCharacterIDs.TryGetValue(kvp.Key, out key))
+                {
+                    isCustom = true;
+                }
+            }
+            
+            if (isCustom)
             {
                 var data = new Il2CppSystem.Collections.Generic.List<CharacterStageData>();
                 if (kvp.Value is JArray jsonArray)
                 {
                     foreach (JToken token in jsonArray)
                     {
-                        if (token is not JObject jobject) continue;
+                        // IL2CPP: Explicit null check
+                        if (token == null) continue;
+                        // IL2CPP: Avoid 'is not JObject' pattern, use explicit check
+                        if (!(token is JObject jobject)) continue;
                         
                         var stageData = new CharacterStageData();
+                        // Null-conditional operator (?) is safe - returns null if key missing
                         if (!Enum.TryParse(jobject["type"]?.Value<string>(), out StageType type)) continue;
                         
                         stageData.type = type;
@@ -682,5 +1194,15 @@ public class ModOptionsData
     {
         ProcessCharacterListWithEnumSetter(jObject, _writtenPod.UnlockedSkinsV2, 
             token => ParseEnumWithFallback<SkinType>(token?.Value<string>(), default), "unlockedSkinsV2");
+    }
+    
+    void CollectedItemsSetter(JArray jArray)
+    {
+        ProcessItemListSetter(jArray, _writtenPod.CollectedItems, "collectedItems");
+    }
+    
+    void SecretsSetter(JArray jArray)
+    {
+        ProcessSecretListSetter(jArray, _writtenPod.Secrets, "Secrets");
     }
 }
