@@ -97,4 +97,11 @@
       </PackageReference>
     </ItemGroup>
 
+    <ItemGroup>
+      <None Remove="resources\PowerUp_Base.json" />
+      <EmbeddedResource Include="resources\PowerUp_Base.json" />
+      <None Remove="resources\PowerUp_Passive.json" />
+      <EmbeddedResource Include="resources\PowerUp_Passive.json" />
+    </ItemGroup>
+
 </Project>

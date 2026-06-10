@@ -4,6 +4,7 @@ using CoffinTech.Logger;
 using CoffinTech.Patches;
 using Il2CppVampireSurvivors.Data;
 using Il2CppVampireSurvivors.Data.Props;
+using MelonLoader;
 using Newtonsoft.Json.Linq;
 
 namespace CoffinTech.SaveData;
@@ -330,14 +331,15 @@ public class ModOptionsData
         }
         if (CustomCharacterIDs.TryGetValue(selectedCharStr, out var characterId))
             _writtenPod.SelectedCharacter = characterId;
-            
-        ProcessAllSetterMethods(jObject);
         
-        // Process unclaimed data if it exists
         if (UnclaimedData.Count > 0)
         {
             ProcessAllSetterMethods(UnclaimedData);
         }
+            
+        ProcessAllSetterMethods(jObject);
+        
+        // Process unclaimed data if it exists
         
         // Save any new unclaimed data
         if (UnclaimedCustomCharacterIDs.Count > 0)
@@ -471,20 +473,24 @@ public class ModOptionsData
         {
             if (!UnclaimedCustomCharacterIDs.Contains(characterId))
             {
+                MelonLogger.Msg("Adding to unclaimed data: " + characterId);
                 UnclaimedCustomCharacterIDs.Add(characterId);
             }
             
             if (!UnclaimedData.ContainsKey(dataKey))
             {
+                MelonLogger.Msg("Creating new JObject for unclaimed data: " + dataKey);
                 UnclaimedData[dataKey] = new JObject();
             }
             
             if (UnclaimedData[dataKey] is JObject jobject)
             {
+                MelonLogger.Msg("Adding to unclaimed jObject: " + characterId + " to " + dataKey);
                 jobject[characterId] = value;
             }
             else if (UnclaimedData[dataKey] is JArray jarray && !jarray.Contains(characterId))
             {
+                MelonLogger.Msg("Adding to unclaimed jArray: " + characterId + " to " + dataKey);
                 jarray.Add(characterId);
             }
         }
@@ -658,7 +664,11 @@ public class ModOptionsData
 
     private void ProcessCharacterListSetter(JArray jArray, Il2CppSystem.Collections.Generic.List<CharacterType> target, string dataKey)
     {
-        foreach (string character in jArray)
+        var toAdd = new List<CharacterType>();
+        var unclaimedToAdd = new List<string>();
+        var snapshot = jArray.ToObject<List<string>>();
+        
+        foreach (string character in snapshot)
         {
             if (character == null) continue;
             
@@ -686,7 +696,6 @@ public class ModOptionsData
                         UnclaimedData[dataKey] = new JArray();
                     }
                 }
-                
                 AddToUnclaimedData(character, dataKey, character);
             }
         }
@@ -694,7 +703,8 @@ public class ModOptionsData
     
     private void ProcessItemListSetter(JArray jArray, Il2CppSystem.Collections.Generic.List<ItemType> target, string dataKey)
     {
-        foreach (string item in jArray)
+        var snapshot = jArray.ToObject<List<string>>();
+        foreach (string item in snapshot)
         {
             if (item == null) continue;
             
@@ -730,7 +740,8 @@ public class ModOptionsData
     
     private void ProcessSecretListSetter(JArray jArray, Il2CppSystem.Collections.Generic.List<SecretType> target, string dataKey)
     {
-        foreach (string item in jArray)
+        var snapshot = jArray.ToObject<List<string>>();
+        foreach (string item in snapshot)
         {
             if (item == null) continue;
             
@@ -854,8 +865,10 @@ public class ModOptionsData
         PlayerOptionsData basePod = new();
         foreach (PropertyInfo propertyInfo in PlayerOptionsDataProperties)
         { 
-            if(_doNotCopy.Contains(propertyInfo.Name) || propertyInfo.Name.Contains("BackingField")) 
+            if(_doNotCopy.Contains(propertyInfo.Name) || propertyInfo.Name.Contains("BackingField"))
+            {
                 continue;
+            }
             if (!propertyInfo.TryGetValue(pod, out var value)) continue;
             typeof(PlayerOptionsData).GetProperty(propertyInfo.Name)?.SetValue(basePod, value);
         }
