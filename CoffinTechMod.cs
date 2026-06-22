@@ -1,5 +1,8 @@
 ﻿using CoffinTech;
+using CoffinTech.Utils;
+using Il2CppInterop.Runtime;
 using MelonLoader;
+using UnityEngine;
 
 [assembly: MelonInfo(typeof(CoffinTechMod), ModInfo.Name, ModInfo.Version, ModInfo.Author, ModInfo.Download)]
 [assembly: MelonGame("poncle", "Vampire Survivors")]
@@ -10,7 +13,7 @@ internal static class ModInfo
 {
     internal const string Name = "CoffinTech";
     internal const string Author = "Takacomic";
-    internal const string Version = "1.2.2";
+    internal const string Version = "1.2.3";
     internal const string Download = "https://github.com/takacomic/.../latest";
 }
 
@@ -37,13 +40,38 @@ public class CoffinTechMod : MelonMod
         DebugLoggingEnabled = DebugLoggingEntry.Value;
         UnityExplorerWarnEnabled = UnityExplorerWarnEntry.Value;
         PowerUpEnabled = PowerUpEntry.Value;
-        
-        
-        OtherPluginPresent = RegisteredMelons
+
+        foreach (var mod in MelonLoader.MelonPlugin.RegisteredMelons)
+        {
+            MelonLogger.Msg($"Found mod: {mod.Info.Name}");
+        }
+        OtherPluginPresent = MelonLoader.MelonPlugin.RegisteredMelons
             .Any(m => m.Info.Name == "SurvivorModMenu");
         if (OtherPluginPresent)
         {
             ModSettings.Initialize();
         }
+        
+        var go = new GameObject("HitboxOverlayRenderer");
+        UnityEngine.Object.DontDestroyOnLoad(go);
+        go.AddComponent<HitboxRenderer>();
+    }
+    
+    public override void OnSceneWasLoaded(int buildIndex, string sceneName)
+    {
+        MelonLogger.Msg($"Scene loaded: {sceneName}");
+        SpawnRenderer();
+    }
+    
+    private void SpawnRenderer()
+    {
+        // Destroy old one if it exists
+        var old = GameObject.Find("HitboxOverlayRenderer");
+        if (old != null) UnityEngine.Object.Destroy(old);
+
+        var go = new GameObject("HitboxOverlayRenderer");
+        UnityEngine.Object.DontDestroyOnLoad(go);
+        go.AddComponent<HitboxRenderer>();
+        MelonLogger.Msg("HitboxRenderer component added");
     }
 }

@@ -1,6 +1,7 @@
 using System.Reflection;
 using CoffinTech.Patches;
 using CoffinTech.Utils;
+using Il2CppI2.Loc;
 using Il2CppNewtonsoft.Json;
 using Il2CppNewtonsoft.Json.Linq;
 using Il2CppVampireSurvivors.Data;
@@ -17,7 +18,6 @@ internal static class ModSettings
     {
         Logger.DebugLogger.Msg("ModSettings.Initialize: registering mod menu.");
         ModMenuRegistry.Register("CoffinTech", "CoffinTech", BuildCoffinTechOptions);
-
     }
 
     internal static void SetBypassChecksum(bool value)
@@ -99,6 +99,48 @@ internal static class ModSettings
         MelonPreferences.Save();
     }
 
+    internal static void DumpWeapons()
+    {
+        var json = new JObject();
+        var types = new JArray();
+        var names = new JArray();
+        foreach (var kvp in DataManagerPatches._instance._weaponData)
+        {
+            
+            json.Add(kvp.Key.ToString(), LocalizationManager.GetTranslation(kvp.Value[0].GetLocalizedNameTerm(kvp.Key)));
+            types.Add(kvp.Key.ToString());
+            names.Add(LocalizationManager.GetTranslation(kvp.Value[0].GetLocalizedNameTerm(kvp.Key)));
+        }
+        json.Add("types", types);
+        json.Add("names", names);
+        var directory = Path.Combine(MelonLoader.Utils.MelonEnvironment.UserDataDirectory, "dumps");
+        var path = Path.Combine(MelonLoader.Utils.MelonEnvironment.UserDataDirectory, "dumps", "weapons.json");
+        if (!Directory.Exists(directory)) Directory.CreateDirectory(directory);
+        //if (!File.Exists(path)) File.Create(path);
+        File.WriteAllText(path, json.ToString());
+    }
+
+    internal static void DumpArcana()
+    {
+        var json = new JObject();
+        var types = new JArray();
+        var names = new JArray();
+        foreach (var kvp in DataManagerPatches._instance.AllArcanas)
+        {
+            
+            json.Add(kvp.Key.ToString(), LocalizationManager.GetTranslation(kvp.Value.GetLocalizedNameTerm(kvp.Key)));
+            types.Add(kvp.Key.ToString());
+            names.Add(LocalizationManager.GetTranslation(kvp.Value.GetLocalizedNameTerm(kvp.Key)));
+        }
+        json.Add("types", types);
+        json.Add("names", names);
+        var directory = Path.Combine(MelonLoader.Utils.MelonEnvironment.UserDataDirectory, "dumps");
+        var path = Path.Combine(MelonLoader.Utils.MelonEnvironment.UserDataDirectory, "dumps", "arcana.json");
+        if (!Directory.Exists(directory)) Directory.CreateDirectory(directory);
+        //if (!File.Exists(path)) File.Create(path);
+        File.WriteAllText(path, json.ToString());
+    }
+
     private static void BuildCoffinTechOptions(ModMenuBuilder builder)
     {
         if (builder == null)
@@ -110,6 +152,8 @@ internal static class ModSettings
             SetBypassChecksum);
         builder.AddToggle("Debug Logging", () => CoffinTechMod.DebugLoggingEnabled, SetDebugLogging);
         builder.AddToggle("PowerUp Passives", () => CoffinTechMod.PowerUpEnabled, SetPowerUp);
+        builder.AddButton("Dump WeaponType and Translations", DumpWeapons);
+        builder.AddButton("Dump ArcanaType and Translations", DumpArcana);
     }
 
 }

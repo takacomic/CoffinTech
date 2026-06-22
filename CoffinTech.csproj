@@ -36,8 +36,14 @@
         <Reference Include="Il2CppPhaserPort">
           <HintPath>$(Il2)\Il2CppPhaserPort.dll</HintPath>
         </Reference>
+        <Reference Include="Il2CppSystem.Core">
+          <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\VSModded\MelonLoader\Il2CppAssemblies\Il2CppSystem.Core.dll</HintPath>
+        </Reference>
         <Reference Include="Il2CppZenject">
           <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\VSModded\MelonLoader\Il2CppAssemblies\Il2CppZenject.dll</HintPath>
+        </Reference>
+        <Reference Include="Unity.Mathematics">
+          <HintPath>..\..\..\..\..\..\Program Files (x86)\Steam\steamapps\common\VSModded\MelonLoader\Il2CppAssemblies\Unity.Mathematics.dll</HintPath>
         </Reference>
         <Reference Include="UnityEngine.AssetBundleModule">
           <HintPath>$(Il2)\UnityEngine.AssetBundleModule.dll</HintPath>

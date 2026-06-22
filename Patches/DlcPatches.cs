@@ -67,9 +67,9 @@ public static class DlcPatches
     private static BundleManifestData CreateBundle(string name, string version, DataManagerSettings data)
     {
         LanguageData = LocalizationManager.Sources._items.First();
-        data._ItemDataJsonAsset = Items(JsonConvert.DeserializeObject<JObject>(data._ItemDataJsonAsset.text ?? "{}"));
-        data._CharacterDataJsonAsset = Characters(JsonConvert.DeserializeObject<JObject>(data._CharacterDataJsonAsset.text ?? "{}"));
-        data._SecretsDataJsonAsset = Secrets(JsonConvert.DeserializeObject<JObject>(data._SecretsDataJsonAsset.text ?? "{}"));
+        if (data._ItemDataJsonAsset) data._ItemDataJsonAsset = Items(JsonConvert.DeserializeObject<JObject>(data._ItemDataJsonAsset.text ?? "{}"));
+        if (data._CharacterDataJsonAsset) data._CharacterDataJsonAsset = Characters(JsonConvert.DeserializeObject<JObject>(data._CharacterDataJsonAsset.text ?? "{}"));
+        if (data._SecretsDataJsonAsset) data._SecretsDataJsonAsset = Secrets(JsonConvert.DeserializeObject<JObject>(data._SecretsDataJsonAsset.text ?? "{}"));
         
         var modDlcData = ScriptableObject.CreateInstance<BundleManifestData>();
         modDlcData._Version = version; 
