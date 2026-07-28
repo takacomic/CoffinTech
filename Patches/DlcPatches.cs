@@ -10,6 +10,7 @@ using MelonLoader;
 using Newtonsoft.Json;
 using Newtonsoft.Json.Linq;
 using UnityEngine;
+using LocalizationManager = CoffinTech.Defaults.LocalizationManager;
 
 namespace CoffinTech.Patches;
 
@@ -66,7 +67,7 @@ public static class DlcPatches
     
     private static BundleManifestData CreateBundle(string name, string version, DataManagerSettings data)
     {
-        LanguageData = LocalizationManager.Sources._items.First();
+        LanguageData = CoffinTech.Defaults.LocalizationManager._First;
         if (data._ItemDataJsonAsset) data._ItemDataJsonAsset = Items(JsonConvert.DeserializeObject<JObject>(data._ItemDataJsonAsset.text ?? "{}"));
         if (data._CharacterDataJsonAsset) data._CharacterDataJsonAsset = Characters(JsonConvert.DeserializeObject<JObject>(data._CharacterDataJsonAsset.text ?? "{}"));
         if (data._SecretsDataJsonAsset) data._SecretsDataJsonAsset = Secrets(JsonConvert.DeserializeObject<JObject>(data._SecretsDataJsonAsset.text ?? "{}"));

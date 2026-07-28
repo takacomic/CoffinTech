@@ -9,17 +9,6 @@ namespace CoffinTech.Patches;
 [HarmonyPatch(typeof(LoadingManager))]
 static class LoadingManagerPatch
 {
-    [HarmonyPatch(nameof(LoadingManager.MountDlc))]
-    [HarmonyPrefix]
-    public static void MountDlc_Prefix(LoadingManager __instance, DlcType dlcType, Action callback)
-    {
-        string path = Path.Combine(Directory.GetCurrentDirectory(), DlcSystem.DlcCatalog._DlcData[dlcType]._Steam._AppID);
-        AddressableLoader.SetInternalIdTransform();
-        AddressableLoader.SetPath(path);
-        if (!string.IsNullOrEmpty(path) && path != Directory.GetCurrentDirectory())
-            __instance.MountedPaths.TryAdd(dlcType, path);
-    }
-    
     [HarmonyPatch(nameof(LoadingManager.LoadDlcs))]
     [HarmonyPrefix]
     public static void PreLoadDlcs(LoadingManager __instance)

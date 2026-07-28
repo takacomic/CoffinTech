@@ -13,7 +13,7 @@ internal static class ModInfo
 {
     internal const string Name = "CoffinTech";
     internal const string Author = "Takacomic";
-    internal const string Version = "1.2.3";
+    internal const string Version = "1.2.4";
     internal const string Download = "https://github.com/takacomic/.../latest";
 }
 
@@ -51,27 +51,5 @@ public class CoffinTechMod : MelonMod
         {
             ModSettings.Initialize();
         }
-        
-        var go = new GameObject("HitboxOverlayRenderer");
-        UnityEngine.Object.DontDestroyOnLoad(go);
-        go.AddComponent<HitboxRenderer>();
-    }
-    
-    public override void OnSceneWasLoaded(int buildIndex, string sceneName)
-    {
-        MelonLogger.Msg($"Scene loaded: {sceneName}");
-        SpawnRenderer();
-    }
-    
-    private void SpawnRenderer()
-    {
-        // Destroy old one if it exists
-        var old = GameObject.Find("HitboxOverlayRenderer");
-        if (old != null) UnityEngine.Object.Destroy(old);
-
-        var go = new GameObject("HitboxOverlayRenderer");
-        UnityEngine.Object.DontDestroyOnLoad(go);
-        go.AddComponent<HitboxRenderer>();
-        MelonLogger.Msg("HitboxRenderer component added");
     }
 }

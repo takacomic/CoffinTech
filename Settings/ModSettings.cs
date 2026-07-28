@@ -107,9 +107,9 @@ internal static class ModSettings
         foreach (var kvp in DataManagerPatches._instance._weaponData)
         {
             
-            json.Add(kvp.Key.ToString(), LocalizationManager.GetTranslation(kvp.Value[0].GetLocalizedNameTerm(kvp.Key)));
+            json.Add(kvp.Key.ToString(), Defaults.LocalizationManager.GetTranslation(kvp.Value[0].GetLocalizedNameTerm(kvp.Key)).ToString());
             types.Add(kvp.Key.ToString());
-            names.Add(LocalizationManager.GetTranslation(kvp.Value[0].GetLocalizedNameTerm(kvp.Key)));
+            names.Add(Defaults.LocalizationManager.GetTranslation(kvp.Value[0].GetLocalizedNameTerm(kvp.Key)));
         }
         json.Add("types", types);
         json.Add("names", names);
@@ -128,9 +128,9 @@ internal static class ModSettings
         foreach (var kvp in DataManagerPatches._instance.AllArcanas)
         {
             
-            json.Add(kvp.Key.ToString(), LocalizationManager.GetTranslation(kvp.Value.GetLocalizedNameTerm(kvp.Key)));
+            json.Add(kvp.Key.ToString(), Defaults.LocalizationManager.GetTranslation(kvp.Value.GetLocalizedNameTerm(kvp.Key)).ToString());
             types.Add(kvp.Key.ToString());
-            names.Add(LocalizationManager.GetTranslation(kvp.Value.GetLocalizedNameTerm(kvp.Key)));
+            names.Add(Defaults.LocalizationManager.GetTranslation(kvp.Value.GetLocalizedNameTerm(kvp.Key)));
         }
         json.Add("types", types);
         json.Add("names", names);

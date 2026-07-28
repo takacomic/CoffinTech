@@ -45,7 +45,7 @@ public class DataManagerPatches
         if (_patched) return;
         _patched = true;
         if (_jObject is null) return;
-        var languageData = LocalizationManager.Sources._items.First();
+        var languageData = Defaults.LocalizationManager._First;
         
         foreach (var kvp in _jObject)
         {
