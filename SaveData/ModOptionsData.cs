@@ -17,6 +17,7 @@ public class ModOptionsData
     // Constants
     private const int Version = 1;
     private const int IDBase = 100000;
+    private const int SecretIDBase = 10000;
     private const string ModSaveDataPath = "UserData/ModSaveData";
     private const string UnclaimedDataFileName = "UnclaimedCharacterData.json";
     private const CharacterType DefaultCharacter = CharacterType.ANTONIO;
@@ -24,14 +25,14 @@ public class ModOptionsData
     private static readonly object LockObject = new();
 
     // Static data storage
-    private static int CharacterIDCounter = IDBase;
+    private static int CharacterIDCounter = SecretIDBase;
     private static readonly Dictionary<CharacterType, string> CustomCharacterNames = new();
     private static readonly Dictionary<string, CharacterType> CustomCharacterIDs = new();
-    private static int ItemIDCounter = IDBase;
+    private static int ItemIDCounter = SecretIDBase;
     private static readonly Dictionary<ItemType, string> CustomItemNames = new();
     private static readonly Dictionary<string, ItemType> CustomItemIDs = new();
     private static readonly List<ItemType> CustomRelicIDs = new();
-    private static int SecretIDCounter = IDBase;
+    private static int SecretIDCounter = SecretIDBase;
     private static readonly Dictionary<SecretType, string> CustomSecretNames = new();
     private static readonly Dictionary<string, SecretType> CustomSecretIDs = new();
     private static readonly List<string> UnclaimedCustomCharacterIDs = new();
